@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Padsmith",
+  "version": "0.1.0",
+  "identifier": "io.padsmith.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../../ui/dist"
+  },
+  "app": {
+    "windows": [{ "label": "main", "title": "Padsmith", "width": 1380, "height": 900, "minWidth": 860, "minHeight": 640, "visible": false, "backgroundColor": "#101216" }],
+    "security": { "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "category": "Utility",
+    "icon": ["icons/icon.png"],
+    "shortDescription": "Controles do seu jeito",
+    "longDescription": "Remapeamento, toggle e macros para controles no Linux."
+  }
+}

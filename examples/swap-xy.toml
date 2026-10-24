@@ -1,0 +1,16 @@
+version = 1
+id = "swap-xy"
+name = "X ↔ Y"
+layout = "xbox"
+
+[buttons.BTN_WEST]
+mode = "hold"
+output = { kind = "gamepad", code = "BTN_NORTH" }
+
+[buttons.BTN_NORTH]
+mode = "hold"
+output = { kind = "gamepad", code = "BTN_WEST" }
+
+[buttons.BTN_SOUTH]
+mode = "toggle"
+output = { kind = "gamepad", code = "BTN_SOUTH" }

@@ -1,0 +1,26 @@
+version = 1
+id = "macros"
+name = "Sequências e turbo"
+layout = "xbox"
+
+[buttons.BTN_SOUTH]
+mode = "turbo"
+hz = 12
+output = { kind = "gamepad", code = "BTN_SOUTH" }
+
+[macros.combo]
+name = "Dois toques e uma tecla"
+steps = [
+  { action = "repeat", count = 2, steps = [
+    { action = "hold", target = { kind = "gamepad", code = "BTN_NORTH" }, ms = 80 },
+    { action = "wait", ms = 120 },
+  ] },
+  { action = "hold", target = { kind = "key", code = "KEY_E" }, ms = 50 },
+]
+
+[[triggers]]
+id = "combo-lb-rb"
+buttons = ["BTN_TL", "BTN_TR"]
+macro_id = "combo"
+kind = "chord"
+consume = true

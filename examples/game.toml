@@ -1,0 +1,29 @@
+version = 1
+id = "game"
+name = "Meu jogo — precisão"
+layout = "xbox"
+processes = ["meu-jogo.exe", "meu-jogo-linux"]
+priority = 10
+devices = []
+
+[layers.precisao]
+name = "Precisão"
+activation = ["BTN_THUMBL"]
+priority = 10
+
+[layers.precisao.buttons.BTN_WEST]
+output = { kind = "gamepad", code = "BTN_NORTH" }
+
+[layers.precisao.axes.ABS_RX]
+deadzone = 0.12
+curve = 1.5
+
+[emergency]
+enabled = true
+buttons = ["BTN_MODE", "BTN_SELECT"]
+hold_ms = 3000
+
+[[shortcuts]]
+buttons = ["BTN_TL", "BTN_START"]
+profile = "$next"
+hold_ms = 700

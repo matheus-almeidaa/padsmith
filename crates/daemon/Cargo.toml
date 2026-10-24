@@ -1,0 +1,20 @@
+[package]
+name = "padsmithd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+evdev.workspace = true
+libc.workspace = true
+notify.workspace = true
+padsmith-core.workspace = true
+padsmith-linux.workspace = true
+padsmith-protocol.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "IPC e eventos da janela local do Padsmith",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

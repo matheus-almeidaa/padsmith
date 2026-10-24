@@ -1,0 +1,46 @@
+version = 1
+id = "desktop"
+name = "Mouse e WASD"
+layout = "xbox"
+
+[buttons.BTN_SOUTH]
+output = { kind = "mouse", code = "BTN_LEFT" }
+
+[buttons.BTN_EAST]
+output = { kind = "key", code = "KEY_SPACE" }
+
+[axes.ABS_X]
+mode = "keys"
+deadzone = 0.15
+threshold = 0.4
+negative = { kind = "key", code = "KEY_A" }
+positive = { kind = "key", code = "KEY_D" }
+
+[axes.ABS_Y]
+mode = "keys"
+deadzone = 0.15
+threshold = 0.4
+negative = { kind = "key", code = "KEY_W" }
+positive = { kind = "key", code = "KEY_S" }
+
+[axes.ABS_RX]
+mode = "mouse"
+target = "REL_X"
+deadzone = 0.15
+sensitivity = 900
+
+[axes.ABS_RY]
+mode = "mouse"
+target = "REL_Y"
+deadzone = 0.15
+sensitivity = 900
+
+[axes.ABS_HAT0X]
+mode = "keys"
+negative = { kind = "key", code = "KEY_LEFT" }
+positive = { kind = "key", code = "KEY_RIGHT" }
+
+[axes.ABS_HAT0Y]
+mode = "keys"
+negative = { kind = "key", code = "KEY_UP" }
+positive = { kind = "key", code = "KEY_DOWN" }
