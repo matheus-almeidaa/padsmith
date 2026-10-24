@@ -17,6 +17,18 @@ nix develop
 nix build 'path:.#default'  # daemon, CLI, interface e entrada no menu
 ```
 
+## AppImage
+
+Para gerar um arquivo que inclui interface, daemon e CLI:
+
+```sh
+bash scripts/build-appimage.sh
+```
+
+O build usa Podman ou Docker e grava o resultado em `target/appimage/`.
+Veja [como gerar e usar o AppImage](docs/appimage.md), incluindo execução no
+NixOS e as permissões necessárias para o controle.
+
 ## Desenvolvimento e testes
 
 O motor em `crates/core` não acessa hardware nem relógios: cada transição recebe

@@ -2,6 +2,7 @@ use padsmith_core::Profile;
 use padsmith_protocol::{Command, Message};
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
+mod appimage;
 mod tray;
 
 #[tauri::command]
@@ -77,6 +78,14 @@ async fn export_profile(app: tauri::AppHandle, profile: Profile) -> Result<bool,
     Ok(true)
 }
 fn main() {
+    match appimage::dispatch() {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("{error:#}");
+            std::process::exit(1);
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if !args.iter().any(|a| a == "--tray") {
@@ -97,6 +106,29 @@ fn main() {
             }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
+                match appimage::start_daemon().await {
+                    Ok(Some(mut child)) => {
+                        let notices = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Err(error) = child.wait().await.and_then(|status| {
+                                if status.success() { Ok(()) } else {
+                                    Err(std::io::Error::other(format!("daemon encerrou com {status}")))
+                                }
+                            }) {
+                                let _ = notices.emit("padsmith", Message::Notice {
+                                    message: format!("Daemon do AppImage: {error}. Consulte ~/.local/state/padsmith/appimage-daemon.log."),
+                                });
+                            }
+                        });
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        eprintln!("Daemon do AppImage: {error:#}");
+                        let _ = handle.emit("padsmith", Message::Notice {
+                            message: format!("Não foi possível iniciar o daemon do AppImage: {error:#}"),
+                        });
+                    }
+                }
                 loop {
                     if let Ok(mut reader) =
                         padsmith_protocol::connect(Command::Watch { device: None }).await

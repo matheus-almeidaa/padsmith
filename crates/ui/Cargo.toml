@@ -8,6 +8,7 @@ license.workspace = true
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+anyhow.workspace = true
 padsmith-core.workspace = true
 padsmith-linux.workspace = true
 padsmith-protocol.workspace = true

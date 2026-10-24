@@ -2674,6 +2674,7 @@ dependencies = [
 name = "padsmith-ui"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "padsmith-core",
  "padsmith-linux",
  "padsmith-protocol",

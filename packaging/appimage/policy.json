@@ -1,0 +1,12 @@
+{
+  "default": [{ "type": "reject" }],
+  "transports": {
+    "containers-storage": {
+      "": [{ "type": "insecureAcceptAnything" }]
+    },
+    "docker": {
+      "docker.io/library/node": [{ "type": "insecureAcceptAnything" }],
+      "docker.io/library/rust": [{ "type": "insecureAcceptAnything" }]
+    }
+  }
+}

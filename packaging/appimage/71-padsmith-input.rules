@@ -1,0 +1,3 @@
+# Cyclone 2 in PS4 and Switch modes, including motion/touchpad siblings.
+SUBSYSTEM=="input", KERNEL=="event*", KERNELS=="000[356]:054C:09CC.*", TAG+="uaccess", ENV{PADSMITH_MANAGED}="1"
+SUBSYSTEM=="input", KERNEL=="event*", KERNELS=="000[356]:057E:2009.*", TAG+="uaccess", ENV{PADSMITH_MANAGED}="1"
