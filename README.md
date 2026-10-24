@@ -25,6 +25,11 @@ estado, evento e tempo monotônico explícito. O adaptador Linux fica em
 
 Na raiz do repositório, entre em `nix develop` antes dos comandos abaixo. O shell
 fornece as bibliotecas GTK/WebKit/libudev e gera o ícone PNG a partir do SVG.
+Também configura `LD_LIBRARY_PATH` para a biblioteca AppIndicator, que a bandeja
+carrega dinamicamente em tempo de execução, e inclui os schemas GSettings em
+`XDG_DATA_DIRS`, necessários para o WebKitGTK calcular corretamente a escala da
+tela. Sem esses schemas, a interface pode aparecer comprimida mesmo com o CSS
+carregado corretamente.
 
 ```sh
 cargo test --workspace
@@ -49,6 +54,20 @@ Para desenvolver a interface, em outro terminal dentro de `nix develop`:
 cargo run -p padsmithd  # primeiro terminal; não execute junto de outro daemon
 cargo tauri dev       # segundo terminal; inicia o frontend Svelte
 ```
+
+Para compilar e executar a interface em release, dentro de `nix develop`:
+
+```sh
+pnpm --dir ui install --frozen-lockfile
+pnpm --dir ui build
+cargo build --release --workspace --features padsmith-ui/custom-protocol
+./target/release/padsmith-ui
+```
+
+`padsmith` é a CLI; `padsmith-ui` abre a janela. O daemon `padsmithd` precisa estar
+ativo para remapear, mas não inicie outra instância se ele já estiver rodando.
+O executável gerado diretamente pelo Cargo deve ser aberto dentro de `nix develop`;
+o pacote Nix configura o ambiente de execução por meio de um wrapper.
 
 O pacote Nix usa `rustPlatform.buildRustPackage`, `cargo-tauri.hook`,
 `fetchPnpmDeps` e `pnpmConfigHook`. `packages.daemon` também permite compilar

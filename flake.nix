@@ -56,6 +56,7 @@
               nixfmt
               gtk3
               glib
+              gsettings-desktop-schemas
               webkitgtk_4_1
               libsoup_3
               libayatana-appindicator
@@ -64,6 +65,14 @@
               libnotify
             ];
             shellHook = ''
+              # The tray loads AppIndicator with dlopen, outside normal link-time lookup.
+              export LD_LIBRARY_PATH="${
+                pkgs.lib.makeLibraryPath [ pkgs.libayatana-appindicator ]
+              }''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+              # WebKitGTK needs these schemas to determine the display scale correctly.
+              if [ -n "''${GSETTINGS_SCHEMAS_PATH:-}" ]; then
+                export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH''${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+              fi
               if [ -f ui/static/padsmith.svg ] && [ -d crates/ui/icons ]; then
                 rsvg-convert -w 128 -h 128 ui/static/padsmith.svg -o crates/ui/icons/icon.png
                 export TAURI_APP_PATH="$PWD/crates/ui"

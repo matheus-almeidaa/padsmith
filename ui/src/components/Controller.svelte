@@ -1,5 +1,8 @@
 <script lang="ts">
   import { label } from '../lib/types';
+  import darkController from '../assets/controllers/controller-dark.webp';
+  import lightController from '../assets/controllers/controller-light.webp';
+
   export let selected = '';
   function emptyButtons() {
     return new Set<string>();
@@ -9,360 +12,449 @@
   export let axes: Record<string, number> = {};
   export let aliases: Record<string, string> = {};
   export let choose: (code: string) => void;
-  const face = [
-    { code: 'BTN_NORTH', x: 460, y: 133 },
-    { code: 'BTN_WEST', x: 426, y: 168 },
-    { code: 'BTN_EAST', x: 494, y: 168 },
-    { code: 'BTN_SOUTH', x: 460, y: 202 },
+
+  // Coordinates follow the source images, so artwork and hit areas scale together.
+  const controls = [
+    {
+      code: 'trigger_left',
+      name: 'ABS_Z',
+      x: 402,
+      y: 55,
+      path: 'M310 83 Q320 56 349 49 L435 29 Q473 21 487 52 L490 61 Q394 73 310 91Z',
+    },
+    {
+      code: 'trigger_right',
+      name: 'ABS_RZ',
+      x: 1134,
+      y: 55,
+      path: 'M1226 83 Q1216 56 1187 49 L1101 29 Q1063 21 1049 52 L1046 61 Q1142 73 1226 91Z',
+    },
+    {
+      code: 'BTN_TL',
+      x: 402,
+      y: 96,
+      path: 'M303 94 Q380 71 472 63 Q489 62 492 81 L489 94 L310 136 Q291 140 295 120Z',
+    },
+    {
+      code: 'BTN_TR',
+      x: 1134,
+      y: 96,
+      path: 'M1233 94 Q1156 71 1064 63 Q1047 62 1044 81 L1047 94 L1226 136 Q1245 140 1241 120Z',
+    },
+    { code: 'BTN_THUMBL', x: 391, y: 336, radius: 103 },
+    {
+      code: 'BTN_SELECT',
+      x: 624,
+      y: 280,
+      path: 'M607 255 H640 a25 25 0 0 1 0 50 H607 a25 25 0 0 1 0 -50Z',
+    },
+    { code: 'BTN_MODE', x: 768, y: 277, radius: 51 },
+    {
+      code: 'BTN_START',
+      x: 912,
+      y: 280,
+      path: 'M895 255 H928 a25 25 0 0 1 0 50 H895 a25 25 0 0 1 0 -50Z',
+    },
+    { code: 'BTN_NORTH', x: 1156, y: 254, radius: 50 },
+    { code: 'BTN_WEST', x: 1065, y: 346, radius: 50 },
+    { code: 'BTN_EAST', x: 1248, y: 346, radius: 50 },
+    { code: 'BTN_SOUTH', x: 1156, y: 438, radius: 50 },
+    {
+      code: 'dpad',
+      x: 574,
+      y: 541,
+      path: 'M556 427 H592 Q615 427 615 452 V503 H660 Q684 503 684 527 V557 Q684 581 660 581 H615 V631 Q615 655 591 655 H557 Q533 655 533 631 V581 H487 Q463 581 463 557 V527 Q463 503 487 503 H533 V452 Q533 427 556 427Z',
+    },
+    { code: 'BTN_THUMBR', x: 965, y: 535, radius: 104 },
   ];
-  const key = (event: KeyboardEvent, code: string) => {
+  const rearButtons = [
+    {
+      code: 'rear_l4',
+      x: 430,
+      path: 'M375 822 L290 922 Q278 938 278 962 V1080 Q278 1118 316 1118 H384',
+    },
+    {
+      code: 'rear_r4',
+      x: 1370,
+      path: 'M1425 822 L1510 922 Q1522 938 1522 962 V1080 Q1522 1118 1484 1118 H1416',
+    },
+  ];
+  const faceButtons = ['BTN_NORTH', 'BTN_WEST', 'BTN_EAST', 'BTN_SOUTH'];
+  let hovered = '';
+  $: focusedCode = hovered || selected;
+  $: focusedLabel = controlLabel(focusedCode, layout, aliases);
+
+  function controlLabel(code: string, currentLayout: string, sources: Record<string, string>) {
+    if (code === 'trigger_left' || code === 'BTN_TL2') return label('ABS_Z', currentLayout);
+    if (code === 'trigger_right' || code === 'BTN_TR2') return label('ABS_RZ', currentLayout);
+    if (code === 'dpad') return 'D-pad';
+    const rear = Object.entries(sources).find(([, source]) => source === code)?.[0];
+    return label(rear ?? code, currentLayout);
+  }
+  function isSelected(code: string, selection: string, sources: Record<string, string>) {
+    return (
+      selection === code ||
+      selection === sources[code] ||
+      (code === 'trigger_left' && selection === 'BTN_TL2') ||
+      (code === 'trigger_right' && selection === 'BTN_TR2')
+    );
+  }
+  function isPressed(
+    code: string,
+    pressed: Set<string>,
+    positions: Record<string, number>,
+    sources: Record<string, string>,
+  ) {
+    if (code === 'trigger_left') return (positions.ABS_Z ?? 0) > 0.01 || pressed.has('BTN_TL2');
+    if (code === 'trigger_right') return (positions.ABS_RZ ?? 0) > 0.01 || pressed.has('BTN_TR2');
+    if (code === 'dpad')
+      return (
+        (positions.ABS_HAT0X ?? 0) !== 0 ||
+        (positions.ABS_HAT0Y ?? 0) !== 0 ||
+        ['BTN_DPAD_UP', 'BTN_DPAD_DOWN', 'BTN_DPAD_LEFT', 'BTN_DPAD_RIGHT'].some((c) =>
+          pressed.has(c),
+        )
+      );
+    return pressed.has(sources[code] ?? code);
+  }
+  function key(event: KeyboardEvent, code: string) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       choose(code);
     }
-  };
+  }
 </script>
 
-<svg
-  class="controller"
-  viewBox="0 0 640 420"
-  aria-label="Controle interativo com disposição Xbox e botões traseiros"
-  role="group"
->
-  <defs>
-    <linearGradient id="shell" x1="0" y1="0" x2=".4" y2="1"
-      ><stop stop-color="#555a60" /><stop offset=".38" stop-color="#373b40" /><stop
-        offset="1"
-        stop-color="#25282c"
-      /></linearGradient
-    >
-    <linearGradient id="grip" x1="0" y1="0" x2="1" y2="1"
-      ><stop stop-color="#303439" /><stop offset="1" stop-color="#1b1e22" /></linearGradient
-    >
-    <radialGradient id="stick"
-      ><stop stop-color="#34383c" /><stop offset=".8" stop-color="#202327" /><stop
-        offset="1"
-        stop-color="#41464b"
-      /></radialGradient
-    >
-    <linearGradient id="button" x2="0" y2="1"
-      ><stop stop-color="#42474d" /><stop offset="1" stop-color="#25292e" /></linearGradient
-    >
-    <filter id="shadow" x="-40%" y="-40%" width="180%" height="200%"
-      ><feDropShadow
-        dx="0"
-        dy="25"
-        stdDeviation="20"
-        flood-color="#000"
-        flood-opacity=".35"
-      /></filter
-    >
-    <pattern id="texture" width="5" height="5" patternUnits="userSpaceOnUse"
-      ><circle cx="2" cy="2" r=".6" fill="#8c949b" opacity=".16" /></pattern
-    >
-  </defs>
-  <ellipse cx="320" cy="374" rx="220" ry="17" fill="currentColor" opacity=".04" />
-  <g filter="url(#shadow)">
-    <g
-      class="hit"
-      class:pressed={(axes.ABS_Z ?? 0) > 0.01 || active.has('BTN_TL2')}
-      role="button"
-      tabindex="0"
-      aria-label={'Configurar ' + label('ABS_Z', layout)}
-      on:click={() => choose('trigger_left')}
-      on:keydown={(e) => key(e, 'trigger_left')}
-      ><rect x="162" y="37" width="80" height="17" rx="5" fill="#30363b" stroke="#60686e" /><text
-        x="202"
-        y="49"
-        class="small">{label('ABS_Z', layout)}</text
-      ></g
-    >
-    <g
-      class="hit"
-      class:pressed={(axes.ABS_RZ ?? 0) > 0.01 || active.has('BTN_TR2')}
-      role="button"
-      tabindex="0"
-      aria-label={'Configurar ' + label('ABS_RZ', layout)}
-      on:click={() => choose('trigger_right')}
-      on:keydown={(e) => key(e, 'trigger_right')}
-      ><rect x="398" y="37" width="80" height="17" rx="5" fill="#30363b" stroke="#60686e" /><text
-        x="438"
-        y="49"
-        class="small">{label('ABS_RZ', layout)}</text
-      ></g
-    >
-    <path
-      d="M148 94c-1-27 9-41 39-41h61l12 40m232 1c1-27-9-41-39-41h-61l-12 40"
-      fill="#22262a"
-      stroke="#555a60"
-      stroke-width="1.5"
-    />
-    <path d="M161 73h89M390 73h89" stroke="#737a81" opacity=".5" />
-    <path
-      d="M165 81h311c25 0 42 19 50 44l49 172c14 54-34 89-70 53l-66-66H201l-66 66c-36 36-84 1-70-53l49-172c8-25 26-44 51-44Z"
-      fill="url(#shell)"
-      stroke="#60666b"
-      stroke-width="1.3"
-    />
-    <path d="m115 166-47 139c-8 32 15 61 41 49l96-105Z" fill="url(#grip)" />
-    <path d="m525 166 47 139c8 32-15 61-41 49l-96-105Z" fill="url(#grip)" />
-    <path
-      d="m115 166-47 139c-8 32 15 61 41 49l96-105Zm410 0 47 139c8 32-15 61-41 49l-96-105Z"
-      fill="url(#texture)"
-    />
-    <path d="M164 88h312c21 0 37 16 45 40" fill="none" stroke="#a9afb5" opacity=".17" />
-    <path d="m124 249-26 79m418-79 26 79" stroke="#747d83" opacity=".15" stroke-width="2" />
-    <g
-      class:chosen={selected === 'BTN_TL'}
-      class:pressed={active.has('BTN_TL')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label={'Configurar ' + label('BTN_TL', layout)}
-      on:click={() => choose('BTN_TL')}
-      on:keydown={(e) => key(e, 'BTN_TL')}
-      ><rect x="155" y="62" width="95" height="22" rx="9" fill="#3e4449" /><text
-        x="202"
-        y="78"
-        class="small">{label('BTN_TL', layout)}</text
-      ></g
-    >
-    <g
-      class:chosen={selected === 'BTN_TR'}
-      class:pressed={active.has('BTN_TR')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label={'Configurar ' + label('BTN_TR', layout)}
-      on:click={() => choose('BTN_TR')}
-      on:keydown={(e) => key(e, 'BTN_TR')}
-      ><rect x="390" y="62" width="95" height="22" rx="9" fill="#3e4449" /><text
-        x="437"
-        y="78"
-        class="small">{label('BTN_TR', layout)}</text
-      ></g
-    >
-    <g
-      class:chosen={selected === 'BTN_MODE'}
-      class:pressed={active.has('BTN_MODE')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar Home"
-      on:click={() => choose('BTN_MODE')}
-      on:keydown={(e) => key(e, 'BTN_MODE')}
-      ><circle cx="320" cy="115" r="18" fill="#23272b" stroke="#5d646a" /><path
-        d="m311 108 18 14m-18 0 18-14"
-        stroke="#d0d8c8"
-        stroke-width="2"
-      /></g
-    >
-    <g
-      class:chosen={selected === 'BTN_SELECT'}
-      class:pressed={active.has('BTN_SELECT')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar Select"
-      on:click={() => choose('BTN_SELECT')}
-      on:keydown={(e) => key(e, 'BTN_SELECT')}
-      ><circle cx="278" cy="163" r="13" fill="url(#button)" stroke="#555c62" /><path
-        d="M273 160h7v6h-7Zm3-3h7v6"
-        fill="none"
-        stroke="#aab1b6"
-      /></g
-    >
-    <g
-      class:chosen={selected === 'BTN_START'}
-      class:pressed={active.has('BTN_START')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar Start"
-      on:click={() => choose('BTN_START')}
-      on:keydown={(e) => key(e, 'BTN_START')}
-      ><circle cx="362" cy="163" r="13" fill="url(#button)" stroke="#555c62" /><path
-        d="M357 159h10m-10 4h10m-10 4h10"
-        stroke="#aab1b6"
-      /></g
-    >
-    <g
-      class:chosen={selected === 'BTN_THUMBL'}
-      class:pressed={active.has('BTN_THUMBL')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar analógico esquerdo L3"
-      on:click={() => choose('BTN_THUMBL')}
-      on:keydown={(e) => key(e, 'BTN_THUMBL')}
-      ><circle cx="183" cy="162" r="49" fill="#202327" stroke="#61686e" /><circle
-        cx="183"
-        cy="162"
-        r="38"
-        fill="url(#stick)"
-        stroke="#14171a"
-        stroke-width="4"
-      /><circle cx="183" cy="162" r="30" fill="none" stroke="#535960" stroke-dasharray="1 3" /></g
-    >
-    <g
-      class:chosen={selected === 'BTN_THUMBR'}
-      class:pressed={active.has('BTN_THUMBR')}
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar analógico direito R3"
-      on:click={() => choose('BTN_THUMBR')}
-      on:keydown={(e) => key(e, 'BTN_THUMBR')}
-      ><circle cx="385" cy="257" r="48" fill="#202327" stroke="#5e666d" /><circle
-        cx="385"
-        cy="257"
-        r="37"
-        fill="url(#stick)"
-        stroke="#14171a"
-        stroke-width="4"
-      /><circle cx="385" cy="257" r="29" fill="none" stroke="#535960" stroke-dasharray="1 3" /></g
-    >
-    <g
-      class="hit"
-      role="button"
-      tabindex="0"
-      aria-label="Configurar d-pad"
-      class:pressed={(axes.ABS_HAT0X ?? 0) !== 0 ||
-        (axes.ABS_HAT0Y ?? 0) !== 0 ||
-        ['BTN_DPAD_UP', 'BTN_DPAD_DOWN', 'BTN_DPAD_LEFT', 'BTN_DPAD_RIGHT'].some((c) =>
-          active.has(c),
-        )}
-      on:click={() => choose('dpad')}
-      on:keydown={(e) => key(e, 'dpad')}
-      ><circle cx="249" cy="257" r="43" fill="#272b30" stroke="#50575d" /><path
-        d="M237 225h24v20h20v24h-20v20h-24v-20h-20v-24h20Z"
-        fill="#383e44"
-        stroke="#111518"
-        stroke-width="2"
-      /><path
-        d="m244 237 5-5 5 5m-22 15-5 5 5 5m34-10 5 5-5 5m-22 15 5 5 5-5"
-        fill="none"
-        stroke="#787f86"
-      /></g
-    >
-    {#each face as b}
+<div class="controller-art">
+  <svg
+    class="controller"
+    viewBox="0 0 1800 1250"
+    aria-label="Controle interativo com botões traseiros L4 e R4"
+    role="group"
+  >
+    <g class="artwork" transform="translate(132 60)" aria-hidden="true">
+      <image class="shell shell-dark" href={darkController} width="1536" height="1024" />
+      <image class="shell shell-light" href={lightController} width="1536" height="1024" />
+    </g>
+
+    <g transform="translate(132 60)">
+      {#each controls as control}
+        <g
+          class="hit"
+          class:chosen={isSelected(control.code, selected, aliases)}
+          class:pressed={isPressed(control.code, active, axes, aliases)}
+          role="button"
+          tabindex="0"
+          aria-label={'Configurar ' + controlLabel(control.code, layout, aliases)}
+          aria-pressed={isSelected(control.code, selected, aliases)}
+          on:click={() => choose(control.code)}
+          on:keydown={(event) => key(event, control.code)}
+          on:mouseenter={() => (hovered = control.code)}
+          on:mouseleave={() => (hovered = '')}
+          on:focus={() => (hovered = control.code)}
+          on:blur={() => (hovered = '')}
+        >
+          <title>{controlLabel(control.code, layout, aliases)} · Clique para configurar</title>
+          {#if control.radius}
+            <circle class="halo" cx={control.x} cy={control.y} r={control.radius + 10} />
+            <circle class="button-outline" cx={control.x} cy={control.y} r={control.radius} />
+          {:else}
+            <path class="halo" d={control.path} />
+            <path class="button-outline" d={control.path} />
+          {/if}
+          {#if layout !== 'xbox' && faceButtons.includes(control.code)}
+            <circle class="label-cover" cx={control.x} cy={control.y} r="38" />
+            <text class="face-label" x={control.x} y={control.y + 2}
+              >{label(control.code, layout)}</text
+            >
+          {/if}
+          {#if ['trigger_left', 'trigger_right', 'BTN_TL', 'BTN_TR'].includes(control.code)}
+            <rect
+              class="label-cover"
+              x={control.x - 34}
+              y={control.y - 16}
+              width="68"
+              height="32"
+              rx="10"
+            />
+            <text class="shoulder-label" x={control.x} y={control.y + 1}
+              >{label(control.name ?? control.code, layout)}</text
+            >
+          {/if}
+        </g>
+      {/each}
+    </g>
+
+    {#each rearButtons as rear}
       <g
-        class:chosen={selected === b.code}
-        class:pressed={active.has(b.code)}
-        class="hit face"
-        role="button"
-        tabindex="0"
-        aria-label={'Configurar ' + label(b.code, layout)}
-        on:click={() => choose(b.code)}
-        on:keydown={(e) => key(e, b.code)}
+        class="rear"
+        class:chosen={isSelected(rear.code, selected, aliases)}
+        class:pressed={isPressed(rear.code, active, axes, aliases)}
       >
-        <circle cx={b.x} cy={b.y} r="22" fill="#1c2024" />
-        <circle class="cap" cx={b.x} cy={b.y - 1} r="18" fill="url(#button)" stroke="#565d64" />
-        <text x={b.x} y={b.y + 6} class:west={b.code === 'BTN_WEST'}>{label(b.code, layout)}</text>
+        <path class="rear-leader" d={rear.path} />
+        <circle class="rear-anchor" cx={rear.code === 'rear_l4' ? 375 : 1425} cy="822" r="7" />
+        <g
+          class="hit"
+          role="button"
+          tabindex="0"
+          aria-label={'Configurar botão traseiro ' + label(rear.code)}
+          aria-pressed={isSelected(rear.code, selected, aliases)}
+          on:click={() => choose(rear.code)}
+          on:keydown={(event) => key(event, rear.code)}
+          on:mouseenter={() => (hovered = rear.code)}
+          on:mouseleave={() => (hovered = '')}
+          on:focus={() => (hovered = rear.code)}
+          on:blur={() => (hovered = '')}
+        >
+          <title>{label(rear.code)} · Botão na parte de trás do controle</title>
+          <circle class="halo" cx={rear.x} cy="1118" r="57" />
+          <circle class="rear-cap" cx={rear.x} cy="1118" r="46" />
+          <text class="rear-label" x={rear.x} y="1120">{label(rear.code)}</text>
+        </g>
       </g>
     {/each}
-    <path d="M308 193h24" stroke="#747d84" stroke-linecap="round" stroke-width="4" />
-  </g>
-  <g
-    class:chosen={selected === 'rear_l4' || selected === aliases.rear_l4}
-    class:pressed={active.has(aliases.rear_l4 ?? '')}
-    class="hit rear"
-    role="button"
-    tabindex="0"
-    aria-label="Identificar botão traseiro L4"
-    on:click={() => choose('rear_l4')}
-    on:keydown={(e) => key(e, 'rear_l4')}
-    ><path
-      d="m163 310 20-25c6-7 16-2 13 7l-11 31c-4 10-17 8-22 2Z"
-      fill="#41494a"
-      stroke="#899a7b"
-    /><text x="180" y="348">L4</text><path d="m180 331 0 6" stroke="#7b8582" /></g
-  >
-  <g
-    class:chosen={selected === 'rear_r4' || selected === aliases.rear_r4}
-    class:pressed={active.has(aliases.rear_r4 ?? '')}
-    class="hit rear"
-    role="button"
-    tabindex="0"
-    aria-label="Identificar botão traseiro R4"
-    on:click={() => choose('rear_r4')}
-    on:keydown={(e) => key(e, 'rear_r4')}
-    ><path
-      d="m477 310-20-25c-6-7-16-2-13 7l11 31c4 10 17 8 22 2Z"
-      fill="#41494a"
-      stroke="#899a7b"
-    /><text x="460" y="348">R4</text><path d="m460 331 0 6" stroke="#7b8582" /></g
-  >
-</svg>
+
+    <g class="rear-caption" aria-hidden="true">
+      <path
+        d="M886 1105 H914 M906 1097 L914 1105 L906 1113 M914 1105 V1119 Q914 1131 902 1131 H886"
+      />
+      <text x="900" y="1171">BOTÕES TRASEIROS</text>
+    </g>
+  </svg>
+  <div class="interaction-hint" aria-hidden="true">
+    {#if focusedLabel}
+      <span class="hint-key">{focusedLabel}</span>
+      <span>{hovered ? 'Clique para configurar' : 'Selecionado para configurar'}</span>
+    {:else}
+      <span>Passe o mouse ou selecione um botão</span>
+    {/if}
+  </div>
+</div>
 
 <style>
-  .controller {
+  .controller-art {
+    position: relative;
     width: 100%;
-    max-width: 730px;
+    max-width: 860px;
+    padding-bottom: 32px;
+    --button-glow: #baf266;
+    --button-ink: #20251c;
+    --label-bg: #292b2c;
+    --label-fg: #f4f5f2;
+  }
+  .controller {
+    display: block;
+    width: 100%;
     overflow: visible;
-    color: var(--text);
   }
-  text {
-    font:
-      600 17px 'Inter',
-      sans-serif;
-    text-anchor: middle;
-    fill: #c9ced2;
+  .artwork {
     pointer-events: none;
+    filter: drop-shadow(0 28px 26px #0004);
   }
-  .small {
-    font-size: 11px;
-    letter-spacing: 1px;
+  .shell-light {
+    display: none;
+  }
+  :global(:root[data-theme='light']) .controller-art {
+    --button-glow: #6b9f2b;
+    --label-bg: #f0f1ef;
+    --label-fg: #30332e;
+  }
+  :global(:root[data-theme='light']) .shell-light {
+    display: block;
+  }
+  :global(:root[data-theme='light']) .shell-dark {
+    display: none;
+  }
+  @media (prefers-color-scheme: light) {
+    :global(:root:not([data-theme='dark'])) .controller-art {
+      --button-glow: #6b9f2b;
+      --label-bg: #f0f1ef;
+      --label-fg: #30332e;
+    }
+    :global(:root:not([data-theme='dark'])) .shell-light {
+      display: block;
+    }
+    :global(:root:not([data-theme='dark'])) .shell-dark {
+      display: none;
+    }
   }
   .hit {
     cursor: pointer;
     outline: none;
   }
-  .hit > * {
+  .button-outline,
+  .halo,
+  .rear-cap,
+  .rear-leader,
+  .rear-anchor {
     transition:
-      stroke 0.15s,
-      fill 0.15s,
-      filter 0.15s;
+      fill 180ms ease,
+      stroke 180ms ease,
+      opacity 180ms ease,
+      filter 180ms ease,
+      transform 180ms ease;
   }
-  .hit:hover > circle,
-  .hit:focus > circle,
-  .chosen > circle,
-  .chosen > rect,
-  .chosen > path,
-  .hit:hover > rect {
-    stroke: #baf266;
-    stroke-width: 2;
+  .button-outline {
+    fill: transparent;
+    stroke: transparent;
+    stroke-width: 5;
+    transform-box: fill-box;
+    transform-origin: center;
   }
-  .pressed > .cap,
-  .pressed > rect,
-  .pressed > circle:first-child {
-    fill: #baf266;
-    stroke: #d0ff8a;
+  .halo {
+    fill: none;
+    stroke: var(--button-glow);
+    stroke-width: 16;
+    opacity: 0;
+    pointer-events: none;
+    filter: blur(9px);
   }
-  .pressed text {
-    fill: #192214;
+  .hit:hover .button-outline,
+  .hit:focus-visible .button-outline {
+    fill: color-mix(in srgb, var(--button-glow) 16%, transparent);
+    stroke: var(--button-glow);
+    transform: scale(1.035);
   }
-  .chosen text {
-    fill: #baf266;
+  .hit:hover .halo,
+  .hit:focus-visible .halo {
+    opacity: 0.45;
   }
-  .rear text {
-    font:
-      500 12px 'Inter',
-      sans-serif;
-    fill: #9ba698;
-    letter-spacing: 1px;
+  .chosen .button-outline {
+    stroke: var(--button-glow);
+    fill: color-mix(in srgb, var(--button-glow) 10%, transparent);
+    filter: drop-shadow(0 0 7px var(--button-glow));
   }
-  .rear.pressed > path:first-child {
-    fill: #baf266;
-    stroke: #d0ff8a;
+  .chosen .halo {
+    opacity: 0.25;
   }
-  .face text.west {
-    fill: #baf266;
+  .pressed .button-outline {
+    fill: color-mix(in srgb, var(--button-glow) 48%, transparent);
+    stroke: var(--button-glow);
+    transform: scale(0.96);
+    filter: drop-shadow(0 0 14px var(--button-glow));
   }
-  .face.pressed text.west {
-    fill: #192214;
+  .pressed .halo {
+    opacity: 0.7;
   }
-  .hit:focus {
-    filter: drop-shadow(0 0 3px #baf266);
+  text {
+    text-anchor: middle;
+    dominant-baseline: middle;
+    font-family: Inter, sans-serif;
+    pointer-events: none;
+    user-select: none;
+  }
+  .label-cover {
+    fill: var(--label-bg);
+    pointer-events: none;
+  }
+  .face-label {
+    fill: var(--label-fg);
+    font-size: 60px;
+    font-weight: 600;
+  }
+  .shoulder-label {
+    fill: var(--label-fg);
+    font-size: 27px;
+    font-weight: 750;
+  }
+  .rear-leader {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 3;
+    stroke-dasharray: 7 11;
+    stroke-linecap: round;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .rear-anchor {
+    fill: var(--surface);
+    stroke: var(--muted);
+    stroke-width: 3;
+    pointer-events: none;
+  }
+  .rear-cap {
+    fill: var(--surface-raised);
+    stroke: var(--muted);
+    stroke-width: 3;
+  }
+  .rear-label {
+    fill: var(--text);
+    font-size: 32px;
+    font-weight: 650;
+  }
+  .rear:hover .rear-cap,
+  .rear:focus-within .rear-cap,
+  .rear.chosen .rear-cap {
+    stroke: var(--button-glow);
+    fill: color-mix(in srgb, var(--button-glow) 13%, var(--surface));
+    filter: drop-shadow(0 0 13px color-mix(in srgb, var(--button-glow) 40%, transparent));
+  }
+  .rear:hover .rear-leader,
+  .rear:focus-within .rear-leader,
+  .rear.chosen .rear-leader,
+  .rear.pressed .rear-leader {
+    stroke: var(--button-glow);
+    opacity: 1;
+  }
+  .rear.chosen .rear-label,
+  .rear:hover .rear-label {
+    fill: var(--button-glow);
+  }
+  .rear.pressed .rear-cap,
+  .rear.pressed .rear-anchor {
+    fill: var(--button-glow);
+    stroke: var(--button-glow);
+  }
+  .rear.pressed .rear-label {
+    fill: var(--button-ink);
+  }
+  .rear-caption {
+    fill: var(--muted);
+  }
+  .rear-caption path {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .rear-caption text {
+    font-size: 22px;
+    letter-spacing: 4px;
+    font-weight: 500;
+  }
+  .interaction-hint {
+    position: absolute;
+    bottom: 12px;
+    inset-inline: 0;
+    min-height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 9px;
+    color: var(--muted);
+    font-size: 10px;
+    pointer-events: none;
+  }
+  .hint-key {
+    min-width: 24px;
+    padding: 4px 7px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    border-radius: 6px;
+    color: var(--accent);
+    background: var(--accent-tint);
+    font-weight: 600;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hit .button-outline,
+    .hit .halo,
+    .hit .rear-cap,
+    .rear .rear-leader,
+    .rear .rear-anchor {
+      transition: none;
+    }
+    .hit .button-outline {
+      transform: none;
+    }
   }
 </style>
