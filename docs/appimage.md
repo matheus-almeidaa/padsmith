@@ -7,17 +7,23 @@ do mesmo AppImage e continua funcionando quando a interface é encerrada.
 
 ## Gerar
 
-Na raiz, com Podman ou Docker disponível:
+Na raiz, entre no ambiente do projeto e use o atalho:
 
 ```sh
-bash scripts/build-appimage.sh
+nix develop
+build-appimage
 ```
 
-No NixOS, sem instalar Podman globalmente:
+O comando é fornecido pelo `flake.nix`, inclui Podman e só fica disponível nesse
+ambiente. Depois de entrar na raiz, também funciona ao navegar para subpastas do
+projeto. Para executar sem abrir um shell interativo:
 
 ```sh
-nix shell --inputs-from . nixpkgs#podman --command bash scripts/build-appimage.sh
+nix develop --command build-appimage
 ```
+
+Fora do ambiente Nix, com Podman ou Docker disponível, use
+`bash scripts/build-appimage.sh`.
 
 O build usa Debian 12 em um container, incluindo o frontend e todos os binários.
 A fonte é montada somente para leitura; os arquivos são compilados em uma cópia
@@ -26,6 +32,10 @@ São necessários acesso à rede e espaço para as dependências do container.
 `CONTAINER_ENGINE=docker` ou `CONTAINER_ENGINE=podman` escolhe o engine.
 O cache de compilação fica em `target/appimage/.cache/`; ele não precisa ser
 distribuído junto do AppImage e pode ser removido para liberar espaço.
+Os diretórios `target/debug`, `target/release`, `ui/dist` e `ui/node_modules`
+também são regeneráveis e não são necessários para executar o AppImage pronto.
+Depois de remover o cache, a próxima compilação será completa e recriará os
+arquivos de build necessários.
 
 O resultado fica em `target/appimage/`, junto do checksum e das regras udev:
 

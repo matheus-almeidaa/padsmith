@@ -40,10 +40,26 @@
         system:
         let
           pkgs = forSystem system;
+          buildAppImage = pkgs.writeShellApplication {
+            name = "build-appimage";
+            runtimeInputs = [
+              pkgs.podman
+              pkgs.coreutils
+            ];
+            text = ''
+              project_root="''${PADSMITH_PROJECT_ROOT:-$PWD}"
+              if [[ ! -f "$project_root/scripts/build-appimage.sh" ]]; then
+                printf 'Entre em nix develop na raiz do Padsmith para usar build-appimage.\n' >&2
+                exit 1
+              fi
+              exec ${pkgs.bash}/bin/bash "$project_root/scripts/build-appimage.sh"
+            '';
+          };
         in
         {
           default = pkgs.mkShell {
             packages = with pkgs; [
+              buildAppImage
               cargo
               rustc
               rustfmt
@@ -77,6 +93,7 @@
                 rsvg-convert -w 128 -h 128 ui/static/padsmith.svg -o crates/ui/icons/icon.png
                 export TAURI_APP_PATH="$PWD/crates/ui"
                 export TAURI_FRONTEND_PATH="$PWD/ui"
+                export PADSMITH_PROJECT_ROOT="$PWD"
               fi
             '';
           };
