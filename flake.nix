@@ -55,11 +55,24 @@
               exec ${pkgs.bash}/bin/bash "$project_root/scripts/build-appimage.sh"
             '';
           };
+          cleanProject = pkgs.writeShellApplication {
+            name = "clean-project";
+            runtimeInputs = [ pkgs.coreutils ];
+            text = ''
+              project_root="''${PADSMITH_PROJECT_ROOT:-$PWD}"
+              if [[ ! -f "$project_root/scripts/clean-project.sh" ]]; then
+                printf 'Entre em nix develop na raiz do Padsmith para usar clean-project.\n' >&2
+                exit 1
+              fi
+              exec ${pkgs.bash}/bin/bash "$project_root/scripts/clean-project.sh" "$@"
+            '';
+          };
         in
         {
           default = pkgs.mkShell {
             packages = with pkgs; [
               buildAppImage
+              cleanProject
               cargo
               rustc
               rustfmt

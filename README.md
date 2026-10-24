@@ -24,11 +24,15 @@ Para gerar um arquivo que inclui interface, daemon e CLI:
 ```sh
 nix develop
 build-appimage
+clean-project
 ```
 
 O comando `build-appimage` fica disponível no ambiente deste projeto e já inclui
 Podman. Também é possível executar `nix develop --command build-appimage`.
 O build grava o resultado em `target/appimage/`.
+Depois da compilação, `clean-project` remove caches e artefatos temporários,
+preservando o AppImage e os arquivos de distribuição. Também pode ser executado
+com `nix develop --command clean-project`.
 Veja [como gerar e usar o AppImage](docs/appimage.md), incluindo execução no
 NixOS e as permissões necessárias para o controle.
 

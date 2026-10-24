@@ -52,6 +52,33 @@ A arquitetura acompanha a máquina que faz o build. O baseline é Debian 12
 (glibc 2.36); AppImage não torna o programa compatível com distribuições mais
 antigas que as bibliotecas básicas usadas na compilação.
 
+## Limpar depois da compilação
+
+No mesmo ambiente do projeto, compile e depois libere o espaço dos arquivos
+temporários:
+
+```sh
+nix develop
+build-appimage
+clean-project
+```
+
+Também é possível limpar sem abrir um shell interativo:
+
+```sh
+nix develop --command clean-project
+```
+
+O comando remove `target/debug`, `target/release`, `target/appimage/.cache`,
+`target/appimage-sidecars`, `ui/node_modules`, `ui/dist`, `.playwright-mcp` e os
+metadados regeneráveis do Cargo. Os AppImages, checksums, regras udev e documentos
+em `target/appimage/` são preservados. A próxima build recriará o cache e será
+completa. Assim como `build-appimage`, o atalho funciona a partir de subpastas
+depois de entrar em `nix develop` pela raiz.
+
+Fora do ambiente Nix, use `bash scripts/clean-project.sh`. Para consultar a ajuda,
+execute `clean-project --help`.
+
 ## Executar
 
 ```sh
