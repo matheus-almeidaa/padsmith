@@ -54,6 +54,9 @@
   let theme = localStorage.getItem('padsmith-theme') ?? 'system';
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  let listenTimer: ReturnType<typeof setTimeout> | undefined;
+  let listenRoles = new Set<string>();
+  let listenDropped = 0;
   let streamBuffer: RawEvent[] = [];
   let liveAxes: Record<string, number> = {};
   let learnCallback: ((code: string) => void) | null = null;
@@ -63,6 +66,7 @@
   $: if (editingLayer && !profile.layers?.[editingLayer]) editingLayer = '';
   $: currentMap = editingLayer ? (profile.layers?.[editingLayer] ?? profile) : profile;
   $: controller = status.controllers.find((c) => c.device.id === selectedDevice);
+  $: if (page !== 'remap' || !connected || !controller || controller.error) stopListening();
   $: mappedCount = Object.keys(currentMap.buttons).length;
   $: rear = selected.startsWith('rear_');
   $: selectedLabel = label(
@@ -95,6 +99,40 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => (toast = ''), 4500);
   }
+  function stopListening() {
+    clearTimeout(listenTimer);
+    listenTimer = undefined;
+    listening = false;
+  }
+  function toggleListening() {
+    if (listening) {
+      stopListening();
+      return;
+    }
+    if (!connected || !controller || controller.error) return;
+    learnCallback = null;
+    hardwareNotice = '';
+    listenRoles = new Set();
+    listenDropped = 0;
+    listening = true;
+    const isRear = selected.startsWith('rear_');
+    const name = label(selected, profile.layout);
+    listenTimer = setTimeout(() => {
+      stopListening();
+      if (listenDropped) {
+        hardwareNotice = `A captura perdeu ${listenDropped} eventos e não identificou um pressionamento para ${name}. Repita o teste; esse resultado não permite concluir se o botão envia um evento.`;
+        return;
+      }
+      const traffic = listenRoles.size
+        ? `Foram recebidos dados de ${[...listenRoles].join(', ')}, mas nenhum pressionamento de botão.`
+        : 'Nenhum dado de entrada foi recebido. Confira a conexão e a captura em Diagnóstico.';
+      hardwareNotice = `Nenhum botão identificado para ${name} em 15 segundos. ${traffic} ${
+        isRear
+          ? 'Um traseiro sem comando no software oficial pode não enviar evento neste modo. O Padsmith remapeia eventos evdev; configurar o botão no firmware exige suporte específico ao protocolo do fabricante. Compare com um botão comum no diagnóstico.'
+          : 'Pressione e solte um botão comum e compare os eventos no diagnóstico.'
+      }`;
+    }, 15000);
+  }
   const clone = <T,>(value: T): T => structuredClone(value);
   function receive(message: Message) {
     if (message.event === 'status') {
@@ -107,7 +145,7 @@
         seen = new Set();
         raw = [];
         streamBuffer = [];
-        listening = false;
+        stopListening();
         learnCallback = null;
         hardwareNotice = '';
       }
@@ -123,6 +161,7 @@
       }
     } else if (message.event === 'raw' && message.device === selectedDevice) {
       if (!freeze) streamBuffer.push(message);
+      if (listening && message.event_type !== 0) listenRoles.add(message.role);
       if (message.event_type === 3 && message.role === 'gamepad') {
         const range = controller?.device.nodes.find((n) => n.path === message.node)?.axes?.[
           message.label
@@ -166,7 +205,7 @@
               }
             }
             selected = code;
-            listening = false;
+            stopListening();
             notify(`Evento identificado: ${code}`);
           }
         } else if (message.value === 0) {
@@ -174,8 +213,10 @@
         }
       }
     } else if (message.event === 'notice' || message.event === 'error') notify(message.message);
-    else if (message.event === 'dropped')
+    else if (message.event === 'dropped') {
+      if (listening) listenDropped += message.count;
       notify(`O monitor perdeu ${message.count} eventos. O processamento de saída é independente.`);
+    }
   }
   onMount(() => {
     let disposed = false,
@@ -184,6 +225,7 @@
       connected = false;
       active = new Set();
       liveAxes = {};
+      stopListening();
     })
       .then((fn) => {
         if (disposed) fn();
@@ -205,6 +247,7 @@
       clearInterval(render);
       clearTimeout(saveTimer);
       clearTimeout(toastTimer);
+      stopListening();
     };
   });
   async function persist(next: Profile, revision: number) {
@@ -261,6 +304,7 @@
       error = 'Aguarde aplicar ou desfaça a alteração pendente antes de trocar de perfil.';
       return;
     }
+    stopListening();
     try {
       await request({ command: 'apply', device: selectedDevice || null, profile: id });
       profile = clone(chosen);
@@ -282,6 +326,7 @@
     }
   }
   function choose(code: string) {
+    stopListening();
     hardwareNotice = '';
     if (code.startsWith('rear_') && profile.aliases?.[code]) {
       code = profile.aliases[code];
@@ -306,7 +351,6 @@
       return;
     }
     selected = code;
-    listening = false;
   }
   async function importProfile() {
     try {
@@ -433,7 +477,7 @@
               raw = [];
               streamBuffer = [];
               hardwareNotice = '';
-              listening = false;
+              stopListening();
               learnCallback = null;
               dirty = false;
               history = [];
@@ -629,22 +673,24 @@
             </h2>
             <p class="muted">
               {rear
-                ? 'O firmware pode não expor este botão separadamente. Use a captura para verificar.'
+                ? 'Primeiro identifique o evento recebido; depois escolha uma saída de controle, teclado ou mouse.'
                 : 'Escolha o que acontece quando você pressiona este botão.'}
             </p>
             {#if rear}<div class="info-box">
                 <Icon name="info" size={18} />
                 <p>
-                  Nenhum evento independente foi associado a este traseiro. Isso ainda não determina
-                  o que o firmware expõe.
+                  Um traseiro sem comando no software oficial pode não enviar evento ao Linux. O
+                  Padsmith remapeia eventos recebidos; ele não grava comandos no firmware do
+                  controle. A escuta verifica o modo atual por até 15 segundos.
                 </p>
               </div>
               <button
                 class="button primary full"
-                on:click={() => (listening = !listening)}
-                disabled={!controller || !!controller.error}
+                on:click={toggleListening}
+                aria-pressed={listening}
+                disabled={!connected || !controller || !!controller.error}
                 ><Icon name="record" size={16} />{listening
-                  ? 'Aguardando um botão…'
+                  ? 'Cancelar escuta · até 15 s'
                   : 'Ouvir próximo botão'}</button
               ><button class="text-button" on:click={() => (page = 'diagnostics')}
                 >Abrir diagnóstico completo <Icon name="chevron" size={14} /></button
@@ -745,9 +791,13 @@
                     ? 'Um toque mantém pressionado. O próximo toque solta o botão virtual.'
                     : 'A saída fica pressionada enquanto você segura o botão físico.'}
               </p>
-              <button class="text-button" on:click={() => (listening = !listening)}
+              <button
+                class="text-button"
+                on:click={toggleListening}
+                aria-pressed={listening}
+                disabled={!connected || !controller || !!controller.error}
                 ><Icon name="record" size={15} />{listening
-                  ? 'Aguardando um evento…'
+                  ? 'Cancelar escuta · até 15 s'
                   : 'Identificar outro botão'}</button
               >
               <div class="panel-bottom">
@@ -1085,8 +1135,10 @@
             <h2>E os botões traseiros?</h2>
             <p>Pressione L4, R4 ou M e observe os eventos de <strong>todos os nós</strong>.</p>
             <p class="help">
-              A captura só comprova o que foi observado. Um botão tratado exclusivamente pelo
-              firmware pode não gerar evento evdev independente.
+              Se o botão estiver sem comando no software oficial, o firmware pode não enviar um
+              evento. Receber dados dos sensores não significa que um traseiro foi reconhecido.
+              Teste também um botão comum para confirmar a escuta. Configurar associações no
+              firmware exige suporte específico ao protocolo do fabricante.
             </p>
             <span class="tag">{seen.size} códigos de botão observados nesta sessão</span>
           </section>

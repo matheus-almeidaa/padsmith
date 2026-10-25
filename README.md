@@ -100,6 +100,8 @@ somente daemon/CLI. Confira o [roteiro de validação](docs/validacao.md).
 
 - Controle vetorial interativo, com L4/R4 visíveis, iluminação por eventos e painel
   lateral de remapeamento. A associação de traseiros exige observar um evento.
+  A escuta termina após 15 segundos e informa quando chegaram dados de outros nós,
+  mas nenhum pressionamento de botão.
 - Perfis, macros, analógicos/gatilhos, diagnóstico e configurações na navegação.
 - Editor de macros com timeline arrastável, alternativa por setas e gravação.
 - Tema claro/escuro/sistema, rótulos Xbox/PlayStation/Nintendo, desfazer e edição
@@ -263,6 +265,13 @@ teclas explicitamente mapeáveis; não há emulação de giroscópio/touchpad no
 Se a captura de um traseiro produzir um código padrão ou já associado, a interface
 explica que isso não comprova uma entrada independente. Se dois botões enviarem
 o mesmo código no mesmo nó, eles não podem receber mapas diferentes via evdev.
+
+Um traseiro **sem comando no software oficial** pode não enviar evento algum no
+modo atual. Atribuir um comando no firmware, como faz o GameSir Connect, é uma
+operação diferente de remapear um evento recebido pelo Linux. O Padsmith permite
+destinar eventos observados a controle, teclado ou mouse, mas ainda não implementa
+o protocolo de configuração do fabricante. Veja o resultado da captura física do
+Cyclone 2 em [Validação](docs/validacao.md#captura-física-dos-traseiros-do-cyclone-2).
 
 Não há repasse de vibração/force feedback ao controle físico. O limite de latência
 é uma meta medida do caminho de processamento, não uma garantia de tempo real do
